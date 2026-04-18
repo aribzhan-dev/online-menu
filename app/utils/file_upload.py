@@ -1,12 +1,21 @@
 import os
 import uuid
-from typing import List
+import time
+from datetime import datetime
+from typing import Dict
+
 from fastapi import UploadFile, HTTPException, status
-from PIL import Image
+
+ALLOWED_IMAGE_TYPES: Dict[str, str] = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+}
+
 
 class FileUploadUtility:
-    UPLOAD_DIRECTORY = "uploads"
-    ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/jpg", "image/bmp"]
+    UPLOAD_DIRECTORY = "uploads/images"
     MAX_FILE_SIZE_MB = 5
     MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
@@ -15,41 +24,51 @@ class FileUploadUtility:
 
     async def upload_image(self, file: UploadFile) -> str:
         self._validate_image_type(file.content_type)
-        await self._validate_file_size(file)
-
-        file_extension = self._get_file_extension(file.filename)
-        unique_filename = f"{uuid.uuid4()}.{file_extension}"
-        file_path = os.path.join(self.UPLOAD_DIRECTORY, unique_filename)
+        now = datetime.now()
+        folder = f"{now.year}/{now.month:02}/{now.day:02}"
+        full_path = os.path.join(self.UPLOAD_DIRECTORY, folder)
+        os.makedirs(full_path, exist_ok=True)
+        ext = ALLOWED_IMAGE_TYPES[file.content_type]
+        unique_filename = f"{uuid.uuid4().hex}_{int(time.time())}.{ext}"
+        file_path = os.path.join(full_path, unique_filename)
 
         try:
+            size = 0
+
             with open(file_path, "wb") as buffer:
                 while True:
-                    chunk = await file.read(1024 * 1024)
+                    chunk = await file.read(1024 * 1024)  # 1MB
                     if not chunk:
                         break
-                    buffer.write(chunk)
-        except Exception as e:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to upload file: {e}")
 
-        return file_path
+                    size += len(chunk)
+
+                    if size > self.MAX_FILE_SIZE_BYTES:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"File size exceeds {self.MAX_FILE_SIZE_MB}MB"
+                        )
+
+                    buffer.write(chunk)
+
+        except HTTPException:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise
+
+        except Exception as e:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Upload failed: {e}"
+            )
+        return f"/uploads/images/{folder}/{unique_filename}"
 
     def _validate_image_type(self, content_type: str):
-        if content_type not in self.ALLOWED_IMAGE_TYPES:
+        if content_type not in ALLOWED_IMAGE_TYPES:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid image type. Only {', '.join(self.ALLOWED_IMAGE_TYPES)} are allowed."
+                detail=f"Invalid image type. Allowed: {', '.join(ALLOWED_IMAGE_TYPES.keys())}"
             )
-
-    async def _validate_file_size(self, file: UploadFile):
-        await file.seek(0, os.SEEK_END)
-        file_size = file.tell()
-        await file.seek(0)
-
-        if file_size > self.MAX_FILE_SIZE_BYTES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File size exceeds the maximum limit of {self.MAX_FILE_SIZE_MB}MB."
-            )
-
-    def _get_file_extension(self, filename: str) -> str:
-        return filename.split(".")[-1].lower()

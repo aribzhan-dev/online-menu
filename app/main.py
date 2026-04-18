@@ -22,8 +22,7 @@ app = FastAPI(
     description="API for managing online menus for cafes and restaurants."
 )
 
-app.mount("/static", StaticFiles(directory="./uploads"), name="static")
-
+app.mount("/uploads", StaticFiles(directory="./uploads"), name="uploads")
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(company.router, prefix="/api/company", tags=["Company"])
