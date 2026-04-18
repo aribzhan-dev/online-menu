@@ -1,8 +1,7 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-
+from sqlalchemy import select, or_
 from app.core.db import get_db
 from app.schemas.company import CompanyResponse
 from app.schemas.category import CategoryResponse
@@ -56,3 +55,32 @@ async def get_public_products_by_tag(
 ):
     products = await product_service.get_products_by_tag(company.id, tag, db)
     return [p for p in products if p.status and p.is_available]
+
+
+@router.get("/{company_id}/search")
+async def search_products(
+    company_id: int,
+    q: str = Query(..., min_length=1),
+    limit: int = Query(10, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db)
+):
+    query = select(Product).where(
+        Product.company_id == company_id,
+        or_(
+            Product.title.ilike(f"%{q}%"),
+            Product.description.ilike(f"%{q}%")
+        )
+    )
+    query = query.limit(limit).offset(offset)
+
+
+    result = await db.execute(query)
+    products = result.scalars().all()
+
+    return {
+        "count": len(products),
+        "limit": limit,
+        "offset": offset,
+        "results": products
+    }

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from fastapi.security import APIKeyHeader
-
+from fastapi.middleware.cors import CORSMiddleware
 from app.core.db import init_db
 from app.routes import auth, admin, company, menu, upload
 
@@ -20,6 +20,13 @@ app = FastAPI(
     title="Online Menu API",
     version="2.0.0",
     description="API for managing online menus for cafes and restaurants."
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.mount("/uploads", StaticFiles(directory="./uploads"), name="uploads")
