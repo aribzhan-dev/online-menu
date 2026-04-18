@@ -9,6 +9,7 @@ class Category(Base):
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     title = Column(String, nullable=False)
+    image = Column(String, nullable=False)
     status = Column(Boolean, default=True, nullable=False)
 
     company = relationship("Company", back_populates="categories")

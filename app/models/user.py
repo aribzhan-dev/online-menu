@@ -10,7 +10,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     login = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
-    role = Column(Enum(UserRole), default=UserRole.COMPANY, nullable=False)
+    role = Column(Enum(UserRole), default=UserRole.COMPANY, nullable=False, create_type=False)
     is_active = Column(Boolean, default=True, nullable=False)
 
     company = relationship("Company", back_populates="user", uselist=False)

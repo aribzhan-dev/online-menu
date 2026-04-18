@@ -3,28 +3,25 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.db import init_db
 from app.routes import auth, admin, company, menu, upload
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print("Starting up...")
-    await init_db()
-    print("Database initialized.")
-    yield
-    print("Shutting down...")
 
 app = FastAPI(
-    lifespan=lifespan,
     title="Online Menu API",
     version="2.0.0",
     description="API for managing online menus for cafes and restaurants."
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=[
+        "*",
+        "http://localhost:3000",
+        "http://localhost:5000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5000",
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
