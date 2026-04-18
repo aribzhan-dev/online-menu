@@ -6,3 +6,5 @@ alembic.ini
 alembic/
 requirements.txt
 app/scripts
+Pipfile.lock
+Pipfile
