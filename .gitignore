@@ -1,0 +1,8 @@
+.DS_Store
+.idea
+.env
+uploads/
+alembic.ini
+alembic/
+requirements.txt
+app/scripts
