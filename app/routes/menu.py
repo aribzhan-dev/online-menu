@@ -1,7 +1,7 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 from app.core.db import get_db
 from app.schemas.company import CompanyResponse
 from app.schemas.category import CategoryResponse
@@ -61,26 +61,26 @@ async def get_public_products_by_tag(
 async def search_products(
     company_id: int,
     q: str = Query(..., min_length=1),
-    limit: int = Query(10, ge=1, le=50),
-    offset: int = Query(0, ge=0),
+    limit: int = 10,
+    offset: int = 0,
     db: AsyncSession = Depends(get_db)
 ):
-    query = select(Product).where(
-        Product.company_id == company_id,
-        or_(
-            Product.title.ilike(f"%{q}%"),
-            Product.description.ilike(f"%{q}%")
-        )
-    )
-    query = query.limit(limit).offset(offset)
+    similarity_threshold = 0.2
 
+    query = (
+        select(Product)
+        .where(
+            Product.company_id == company_id,
+            Product.status == True,
+            Product.is_available == True,
+            func.similarity(Product.title, q) > similarity_threshold
+        )
+        .order_by(func.similarity(Product.title, q).desc())
+        .limit(limit)
+        .offset(offset)
+    )
 
     result = await db.execute(query)
     products = result.scalars().all()
 
-    return {
-        "count": len(products),
-        "limit": limit,
-        "offset": offset,
-        "results": products
-    }
+    return products
