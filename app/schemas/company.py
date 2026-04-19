@@ -1,6 +1,6 @@
 from datetime import datetime, time
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class CompanyCreateRequest(BaseModel):
@@ -28,6 +28,8 @@ class CompanyProfileUpdate(BaseModel):
 
 
 class CompanyResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     logo: Optional[str] = None
@@ -38,6 +40,3 @@ class CompanyResponse(BaseModel):
     status: bool
     created_at: datetime
     updated_at: datetime
-
-    class ConfigDict:
-        from_attributes = True

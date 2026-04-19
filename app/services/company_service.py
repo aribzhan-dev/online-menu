@@ -56,17 +56,33 @@ async def update_company(company_id: int, data: CompanyUpdate, db: AsyncSession)
     return company
 
 
-async def update_company_profile(company_id: int, data: CompanyProfileUpdate, db: AsyncSession,
-                                 current_user: User) -> Company:
+async def update_company_profile(
+    company_id: int,
+    data: CompanyProfileUpdate,
+    db: AsyncSession,
+    current_user: User
+) -> Company:
+
     if current_user.company.id != company_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this profile")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized"
+        )
 
     company = await get_company(company_id, db)
+
     update_data = data.model_dump(exclude_unset=True)
+
     for key, value in update_data.items():
         setattr(company, key, value)
-    await db.commit()
-    await db.refresh(company)
+
+    try:
+        await db.commit()
+        await db.refresh(company)
+    except:
+        await db.rollback()
+        raise
+
     return company
 
 
@@ -75,3 +91,6 @@ async def delete_company(company_id: int, db: AsyncSession):
     await db.delete(company)
     await db.commit()
     return {"message": "Company and associated user deleted successfully"}
+
+
+

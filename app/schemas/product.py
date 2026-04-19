@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
 from decimal import Decimal
+
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class ProductCreate(BaseModel):
@@ -36,6 +37,8 @@ class ProductUpdate(BaseModel):
 
 
 class ProductResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     company_id: int
     category_id: int
@@ -53,6 +56,3 @@ class ProductResponse(BaseModel):
     status: bool
     created_at: datetime
     updated_at: datetime
-
-    class ConfigDict:
-        from_attributes = True
