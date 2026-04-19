@@ -6,6 +6,9 @@ load_dotenv()
 
 class Settings(BaseSettings):
     DATABASE_URL: str = os.getenv("DATABASE_URL")
+    ALEMBIC_DATABASE_URL: str = os.getenv("ALEMBIC_DATABASE_URL")
+    REDIS_URL: str = os.getenv("REDIS_URL")
+
     POSTGRES_DB: str = os.getenv("POSTGRES_DB")
     POSTGRES_USER: str = os.getenv("POSTGRES_USER")
     POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD")

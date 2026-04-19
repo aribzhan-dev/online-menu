@@ -2,6 +2,7 @@ from typing import List
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from app.core.redis import redis_client
 
 from app.models.products import Product
 from app.models.category import Category
@@ -19,18 +20,14 @@ async def _get_company_product(product_id: int, company_id: int, db: AsyncSessio
     return product
 
 
-async def create_product(company_id: int, data: ProductCreate, db: AsyncSession) -> Product:
-    result = await db.execute(
-        select(Category).filter(Category.id == data.category_id, Category.company_id == company_id)
-    )
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Category not found or does not belong to this company")
-
+async def create_product(company_id: int, data, db):
     new_product = Product(company_id=company_id, **data.model_dump())
     db.add(new_product)
     await db.commit()
     await db.refresh(new_product)
+
+    await clear_product_cache(company_id)
+
     return new_product
 
 
@@ -43,30 +40,29 @@ async def get_product(product_id: int, company_id: int, db: AsyncSession) -> Pro
     return await _get_company_product(product_id, company_id, db)
 
 
-async def update_product(product_id: int, company_id: int, data: ProductUpdate, db: AsyncSession) -> Product:
+async def update_product(product_id: int, company_id: int, data, db):
     product = await _get_company_product(product_id, company_id, db)
 
-    if data.category_id:
-        result = await db.execute(
-            select(Category).filter(Category.id == data.category_id, Category.company_id == company_id)
-        )
-        if not result.scalar_one_or_none():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                                detail="New category not found or does not belong to this company")
-
     update_data = data.model_dump(exclude_unset=True)
+
     for key, value in update_data.items():
         setattr(product, key, value)
+
     await db.commit()
     await db.refresh(product)
+
+    await clear_product_cache(company_id)
+
     return product
 
 
-async def delete_product(product_id: int, company_id: int, db: AsyncSession):
+
+async def delete_product(product_id: int, company_id: int, db):
     product = await _get_company_product(product_id, company_id, db)
     await db.delete(product)
     await db.commit()
-    return {"message": "Product deleted successfully"}
+    await clear_product_cache(company_id)
+    return {"message": "deleted"}
 
 
 async def get_products_by_tag(company_id: int, tag: str, db: AsyncSession) -> List[Product]:
@@ -79,3 +75,11 @@ async def get_products_by_tag(company_id: int, tag: str, db: AsyncSession) -> Li
         select(Product).filter(Product.company_id == company_id, valid_tags[tag].is_(True))
     )
     return result.scalars().all()
+
+
+async def clear_product_cache(company_id: int):
+    await redis_client.delete(f"products:{company_id}")
+
+    keys = await redis_client.keys(f"search:{company_id}:*")
+    if keys:
+        await redis_client.delete(*keys)

@@ -6,13 +6,9 @@ from app.core.db import Base
 class Product(Base):
     __tablename__ = "products"
 
-    __table_args__ = (
-        Index("idx_products_search", "company_id", "title"),
-    )
-
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False, index=True)
     title = Column(String, nullable=False, index=True)
     description = Column(Text, nullable=True)
     image = Column(String, nullable=True)
@@ -28,6 +24,11 @@ class Product(Base):
 
     company = relationship("Company", back_populates="products")
     category = relationship("Category", back_populates="products")
+
+    __table_args__ = (
+        Index("idx_products_company_title", "company_id", "title"),
+        Index("idx_products_company_status_available", "company_id", "status", "is_available"),
+    )
 
 
     def __repr__(self):
