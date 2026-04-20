@@ -1,7 +1,7 @@
 from typing import List
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis import redis_client
@@ -78,12 +78,11 @@ async def create_product(
     return new_product
 
 
-async def get_products(
-    company_id: int,
-    db: AsyncSession,
-) -> List[Product]:
+async def get_products(company_id: int, db: AsyncSession) -> List[Product]:
     result = await db.execute(
-        select(Product).where(Product.company_id == company_id)
+        select(Product)
+        .options(selectinload(Product.category))
+        .where(Product.company_id == company_id)
     )
     return result.scalars().all()
 

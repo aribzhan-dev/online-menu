@@ -119,11 +119,18 @@ async def create_product(
 
 
 @router.get("/products", response_model=List[ProductResponse])
-async def get_products(
+async def get_company_products(
     current_user: User = Depends(get_current_user_token),
     db: AsyncSession = Depends(get_db)
 ):
-    return await product_service.get_products(current_user.company.id, db)
+    products = await product_service.get_products(
+        current_user.company.id,
+        db
+    )
+    return [
+        ProductResponse.model_validate(p)
+        for p in products
+    ]
 
 
 @router.put("/products/{product_id}", response_model=ProductResponse)

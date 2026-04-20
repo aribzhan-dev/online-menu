@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field, ConfigDict
 
+from app.schemas.category import CategoryResponse
 
 class ProductCreate(BaseModel):
     title: str
@@ -45,14 +46,19 @@ class ProductResponse(BaseModel):
     title: str
     description: Optional[str] = None
     image: Optional[str] = None
+
     is_discount: bool
     is_available: bool
     is_new: bool
     is_popular: bool
     is_chef_recommended: bool
+
     new_price: Decimal
     old_price: Optional[Decimal] = None
     preparation_time: Optional[int] = None
+
     status: bool
     created_at: datetime
     updated_at: datetime
+
+    category: Optional[CategoryResponse]
