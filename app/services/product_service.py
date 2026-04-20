@@ -1,7 +1,8 @@
 from typing import List
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, selectinload
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis import redis_client

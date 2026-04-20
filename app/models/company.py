@@ -19,7 +19,10 @@ class Company(Base):
     opening_time = Column(Time, nullable=True)
     closing_time = Column(Time, nullable=True)
     theme_color = Column(
-        Enum(ThemeColor),
+        Enum(
+            ThemeColor,
+            values_callable=lambda x: [e.value for e in x],
+        ),
         default=ThemeColor.LIGHT,
         nullable=False
     )
