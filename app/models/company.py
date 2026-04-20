@@ -1,5 +1,8 @@
 from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, Time
 from sqlalchemy.orm import relationship
+from sqlalchemy import Enum
+
+from app.core.enums import ThemeColor
 from app.core.db import Base
 
 
@@ -15,6 +18,11 @@ class Company(Base):
     wifi_password = Column(String, nullable=True)
     opening_time = Column(Time, nullable=True)
     closing_time = Column(Time, nullable=True)
+    theme_color = Column(
+        Enum(ThemeColor),
+        default=ThemeColor.LIGHT,
+        nullable=False
+    )
     status = Column(Boolean, default=True, nullable=False)
 
     user = relationship("User", back_populates="company")

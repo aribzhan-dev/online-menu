@@ -2,6 +2,7 @@ from datetime import datetime, time
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.enums import ThemeColor
 
 class CompanyCreateRequest(BaseModel):
     name: str
@@ -26,6 +27,7 @@ class CompanyProfileUpdate(BaseModel):
     wifi_password: Optional[str] = None
     opening_time: Optional[time] = None
     closing_time: Optional[time] = None
+    theme_color: Optional[ThemeColor] = None
 
 
 class CompanyResponse(BaseModel):
@@ -42,6 +44,7 @@ class CompanyResponse(BaseModel):
     status: bool
     created_at: datetime
     updated_at: datetime
+    theme_color: ThemeColor
 
 
 class ChangePasswordRequest(BaseModel):
