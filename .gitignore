@@ -8,3 +8,5 @@ requirements.txt
 app/scripts
 Pipfile.lock
 Pipfile
+dump.rdb
+Pipfile.lock

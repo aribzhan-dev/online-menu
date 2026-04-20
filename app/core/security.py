@@ -1,23 +1,22 @@
 from datetime import datetime, timedelta, timezone
 from typing import List
 
-from fastapi.security import HTTPBearer
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from passlib.context import CryptContext
-from jose import JWTError, jwt
-from fastapi import Depends, HTTPException, status, Security, Header
-from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import selectinload
 
-from app.core.db import get_db
 from app.core.config import settings
+from app.core.db import get_db
 from app.core.enums import UserRole
 from app.models.user import User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 security = HTTPBearer()
+
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
@@ -54,43 +53,80 @@ def decode_token(token: str):
 
 
 async def get_current_user_token(
-    credentials: HTTPAuthorizationCredentials = Security(security),
-    db: AsyncSession = Depends(get_db)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
 ):
     token = credentials.credentials
-
     payload = decode_token(token)
 
     if payload is None or payload.get("type") != "access":
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
 
     user_id = payload.get("sub")
+    user_role = payload.get("role")
+    token_version = payload.get("token_version")
 
-    if payload.get("role") == UserRole.ADMIN.value:
-        return {"id": "admin", "role": UserRole.ADMIN.value}
+    if user_id is None or user_role is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload"
+        )
+
+    if user_role == UserRole.ADMIN.value:
+        return {
+            "id": "admin",
+            "login": settings.ADMIN_LOGIN,
+            "role": UserRole.ADMIN,
+            "is_active": True,
+            "token_version": 1
+        }
 
     result = await db.execute(
-        select(User).options(selectinload(User.company)).where(User.id == int(user_id))
+        select(User)
+        .options(selectinload(User.company))
+        .where(User.id == int(user_id))
     )
     user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user"
+        )
+
+    if token_version != user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been invalidated. Please login again."
+        )
 
     return user
 
 
 def check_role(required_roles: List[UserRole]):
     def role_checker(current_user=Depends(get_current_user_token)):
-
         if isinstance(current_user, dict):
             user_role = current_user.get("role")
         else:
             user_role = current_user.role
 
-        if user_role not in [role.value for role in required_roles]:
+        valid_roles = [role.value for role in required_roles]
+
+        if hasattr(user_role, "value"):
+            user_role = user_role.value
+
+        if user_role not in valid_roles:
             raise HTTPException(
-                status_code=403,
+                status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized"
             )
 

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class CategoryCreate(BaseModel):
@@ -15,6 +15,8 @@ class CategoryUpdate(BaseModel):
 
 
 class CategoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     company_id: int
     title: str
@@ -22,6 +24,3 @@ class CategoryResponse(BaseModel):
     status: bool
     created_at: datetime
     updated_at: datetime
-
-    class ConfigDict:
-        from_attributes = True

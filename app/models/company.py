@@ -11,6 +11,7 @@ class Company(Base):
     name = Column(String, nullable=False)
     logo = Column(String, nullable=True)
     description = Column(Text, nullable=True)
+    wifi_name = Column(String, nullable=True)
     wifi_password = Column(String, nullable=True)
     opening_time = Column(Time, nullable=True)
     closing_time = Column(Time, nullable=True)

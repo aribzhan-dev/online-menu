@@ -12,6 +12,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(UserRole), default=UserRole.COMPANY, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    token_version = Column(Integer, nullable=False, default=1)
 
     company = relationship("Company", back_populates="user", uselist=False)
 
