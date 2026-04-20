@@ -38,3 +38,23 @@ async def clear_company_cache(company_id: int):
 
     except Exception as e:
         print("Redis error:", e)
+
+
+
+async def clear_product_cache(company_id: int):
+    try:
+        keys = [
+            f"products:{company_id}",
+            f"categories:{company_id}",
+        ]
+
+        await redis_client.delete(*keys)
+
+        async for key in redis_client.scan_iter(f"search:{company_id}:*"):
+            await redis_client.delete(key)
+
+        async for key in redis_client.scan_iter(f"products_tag:{company_id}:*"):
+            await redis_client.delete(key)
+
+    except Exception as e:
+        print("Redis PRODUCT CLEAR error:", e)

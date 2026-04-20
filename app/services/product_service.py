@@ -2,13 +2,16 @@ from typing import List
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis import redis_client
 from app.models.category import Category
 from app.models.products import Product
 from app.schemas.product import ProductCreate, ProductUpdate
+from app.core.cache import clear_product_cache
+
+
 
 
 async def _get_company_product(
@@ -17,7 +20,9 @@ async def _get_company_product(
     db: AsyncSession,
 ) -> Product:
     result = await db.execute(
-        select(Product).where(
+        select(Product)
+        .options(selectinload(Product.category))  # 🔥 FIX
+        .where(
             Product.id == product_id,
             Product.company_id == company_id,
         )
@@ -53,6 +58,7 @@ async def _validate_category_belongs_to_company(
         )
 
 
+
 async def create_product(
     company_id: int,
     data: ProductCreate,
@@ -82,7 +88,7 @@ async def create_product(
 async def get_products(company_id: int, db: AsyncSession) -> List[Product]:
     result = await db.execute(
         select(Product)
-        .options(selectinload(Product.category))
+        .options(selectinload(Product.category))  # 🔥 FIX
         .where(Product.company_id == company_id)
     )
     return result.scalars().all()
@@ -144,6 +150,7 @@ async def delete_product(
     return {"message": "Product deleted successfully"}
 
 
+
 async def get_products_by_tag(
     company_id: int,
     tag: str,
@@ -158,11 +165,13 @@ async def get_products_by_tag(
     if tag not in valid_tags:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid tag. Use: new, popular, chef_recommended",
+            detail="Invalid tag",
         )
 
     result = await db.execute(
-        select(Product).where(
+        select(Product)
+        .options(selectinload(Product.category))
+        .where(
             Product.company_id == company_id,
             Product.status.is_(True),
             Product.is_available.is_(True),
@@ -170,18 +179,3 @@ async def get_products_by_tag(
         )
     )
     return result.scalars().all()
-
-
-async def clear_product_cache(company_id: int):
-    try:
-        await redis_client.delete(f"products:{company_id}")
-        await redis_client.delete(f"categories:{company_id}")
-
-        async for key in redis_client.scan_iter(f"search:{company_id}:*"):
-            await redis_client.delete(key)
-
-        async for key in redis_client.scan_iter(f"products_tag:{company_id}:*"):
-            await redis_client.delete(key)
-
-    except Exception as e:
-        print("Redis error:", e)

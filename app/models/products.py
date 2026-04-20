@@ -23,7 +23,7 @@ class Product(Base):
     status = Column(Boolean, default=True, nullable=False, index=True)
 
     company = relationship("Company", back_populates="products")
-    category = relationship("Category", back_populates="products")
+    category = relationship("Category", back_populates="products", lazy="selectin")
 
     __table_args__ = (
         Index("idx_products_company_title", "company_id", "title"),

@@ -1,6 +1,7 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
@@ -11,13 +12,18 @@ from app.models.products import Product
 from app.schemas.category import CategoryResponse
 from app.schemas.company import CompanyResponse
 from app.schemas.product import ProductResponse
-from app.services import product_service
 
 router = APIRouter()
 
 
-async def get_active_company(company_id: int, db: AsyncSession = Depends(get_db)) -> Company:
-    result = await db.execute(select(Company).where(Company.id == company_id))
+
+async def get_active_company(
+    company_id: int,
+    db: AsyncSession = Depends(get_db)
+) -> Company:
+    result = await db.execute(
+        select(Company).where(Company.id == company_id)
+    )
     company = result.scalar_one_or_none()
 
     if not company or not company.status:
@@ -31,9 +37,12 @@ async def get_company(company: Company = Depends(get_active_company)):
     return company
 
 
-@router.get("/{company_id}/categories", response_model=List[CategoryResponse])
-async def get_categories(company: Company = Depends(get_active_company), db: AsyncSession = Depends(get_db)):
 
+@router.get("/{company_id}/categories", response_model=List[CategoryResponse])
+async def get_categories(
+    company: Company = Depends(get_active_company),
+    db: AsyncSession = Depends(get_db)
+):
     cache_key = f"categories:{company.id}"
 
     cached = await get_cache(cache_key)
@@ -59,9 +68,12 @@ async def get_categories(company: Company = Depends(get_active_company), db: Asy
     return data
 
 
-@router.get("/{company_id}/products", response_model=List[ProductResponse])
-async def get_products(company: Company = Depends(get_active_company), db: AsyncSession = Depends(get_db)):
 
+@router.get("/{company_id}/products", response_model=List[ProductResponse])
+async def get_products(
+    company: Company = Depends(get_active_company),
+    db: AsyncSession = Depends(get_db)
+):
     cache_key = f"products:{company.id}"
 
     cached = await get_cache(cache_key)
@@ -69,7 +81,9 @@ async def get_products(company: Company = Depends(get_active_company), db: Async
         return cached
 
     result = await db.execute(
-        select(Product).where(
+        select(Product)
+        .options(selectinload(Product.category))  # 🔥 FIX
+        .where(
             Product.company_id == company.id,
             Product.status.is_(True),
             Product.is_available.is_(True)
@@ -88,13 +102,13 @@ async def get_products(company: Company = Depends(get_active_company), db: Async
     return data
 
 
+
 @router.get("/{company_id}/search", response_model=List[ProductResponse])
 async def search_products(
     company: Company = Depends(get_active_company),
     q: str = Query(..., min_length=1),
     db: AsyncSession = Depends(get_db),
 ):
-
     cache_key = f"search:{company.id}:{q}"
 
     cached = await get_cache(cache_key)
@@ -103,6 +117,7 @@ async def search_products(
 
     query = (
         select(Product)
+        .options(selectinload(Product.category))  # 🔥 FIX
         .where(
             Product.company_id == company.id,
             Product.status.is_(True),
