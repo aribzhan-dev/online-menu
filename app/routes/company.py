@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import get_cache, set_cache, clear_company_cache
@@ -12,10 +12,15 @@ from app.schemas.company import CompanyResponse, CompanyProfileUpdate, ChangePas
 from app.schemas.product import ProductCreate, ProductUpdate, ProductResponse
 from app.services import company_service, category_service, product_service
 
+# 🔥 RATE LIMIT
+from app.core.limiter import limiter
+
 router = APIRouter(dependencies=[Depends(check_role([UserRole.COMPANY]))])
 
 
+
 @router.get("/profile", response_model=CompanyResponse)
+@limiter.limit("60/minute")
 async def get_profile(current_user: User = Depends(get_current_user_token)):
     company_id = current_user.company.id
     cache_key = f"company:{company_id}"
@@ -24,13 +29,16 @@ async def get_profile(current_user: User = Depends(get_current_user_token)):
     if cached:
         return cached
 
-    data = CompanyResponse.model_validate(current_user.company).model_dump(mode="json")
-    await set_cache(cache_key, data, 120)
-
-    return data
+    try:
+        data = CompanyResponse.model_validate(current_user.company).model_dump(mode="json")
+        await set_cache(cache_key, data, 120)
+        return data
+    except Exception:
+        raise HTTPException(500, "Failed to load profile")
 
 
 @router.put("/profile", response_model=CompanyResponse)
+@limiter.limit("20/minute")
 async def update_profile(
     request: CompanyProfileUpdate,
     current_user: User = Depends(get_current_user_token),
@@ -47,7 +55,9 @@ async def update_profile(
     return company
 
 
+
 @router.put("/change-password")
+@limiter.limit("10/minute")
 async def change_password_route(
     request: ChangePasswordRequest,
     current_user: User = Depends(get_current_user_token),
@@ -61,7 +71,9 @@ async def change_password_route(
     )
 
 
+
 @router.post("/categories", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/minute")
 async def create_category(
     request: CategoryCreate,
     current_user: User = Depends(get_current_user_token),
@@ -73,6 +85,7 @@ async def create_category(
 
 
 @router.get("/categories", response_model=List[CategoryResponse])
+@limiter.limit("60/minute")
 async def get_categories(
     current_user: User = Depends(get_current_user_token),
     db: AsyncSession = Depends(get_db)
@@ -81,6 +94,7 @@ async def get_categories(
 
 
 @router.put("/categories/{category_id}", response_model=CategoryResponse)
+@limiter.limit("30/minute")
 async def update_category(
     category_id: int,
     request: CategoryUpdate,
@@ -99,6 +113,7 @@ async def update_category(
 
 
 @router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("20/minute")
 async def delete_category(
     category_id: int,
     current_user: User = Depends(get_current_user_token),
@@ -109,7 +124,9 @@ async def delete_category(
     return
 
 
+
 @router.post("/products", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/minute")
 async def create_product(
     request: ProductCreate,
     current_user: User = Depends(get_current_user_token),
@@ -119,6 +136,7 @@ async def create_product(
 
 
 @router.get("/products", response_model=List[ProductResponse])
+@limiter.limit("60/minute")
 async def get_company_products(
     current_user: User = Depends(get_current_user_token),
     db: AsyncSession = Depends(get_db)
@@ -134,6 +152,7 @@ async def get_company_products(
 
 
 @router.put("/products/{product_id}", response_model=ProductResponse)
+@limiter.limit("30/minute")
 async def update_product(
     product_id: int,
     request: ProductUpdate,
@@ -149,6 +168,7 @@ async def update_product(
 
 
 @router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("20/minute")
 async def delete_product(
     product_id: int,
     current_user: User = Depends(get_current_user_token),

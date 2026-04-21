@@ -22,10 +22,11 @@ class Base(DeclarativeBase):
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
-    pool_size=20,
-    max_overflow=40,
-    pool_timeout=30,
+    pool_size=10,
+    max_overflow=5,
+    pool_timeout=10,
     pool_recycle=1800,
+    pool_pre_ping=True,
 )
 
 SessionLocal = async_sessionmaker(

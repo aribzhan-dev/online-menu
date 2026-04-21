@@ -12,33 +12,40 @@ from app.models.products import Product
 from app.schemas.category import CategoryResponse
 from app.schemas.company import CompanyResponse
 from app.schemas.product import ProductResponse
+from app.core.limiter import limiter
 
 router = APIRouter()
-
 
 
 async def get_active_company(
     company_id: int,
     db: AsyncSession = Depends(get_db)
 ) -> Company:
-    result = await db.execute(
-        select(Company).where(Company.id == company_id)
-    )
-    company = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(Company).where(Company.id == company_id)
+        )
+        company = result.scalar_one_or_none()
 
-    if not company or not company.status:
-        raise HTTPException(404, "Company not found")
+        if not company or not company.status:
+            raise HTTPException(404, "Company not found")
 
-    return company
+        return company
+
+    except Exception:
+        raise HTTPException(500, "Database error")
 
 
 @router.get("/{company_id}", response_model=CompanyResponse)
+@limiter.limit("60/minute")
 async def get_company(company: Company = Depends(get_active_company)):
     return company
 
 
 
+
 @router.get("/{company_id}/categories", response_model=List[CategoryResponse])
+@limiter.limit("60/minute")
 async def get_categories(
     company: Company = Depends(get_active_company),
     db: AsyncSession = Depends(get_db)
@@ -49,27 +56,32 @@ async def get_categories(
     if cached:
         return cached
 
-    result = await db.execute(
-        select(Category).where(
-            Category.company_id == company.id,
-            Category.status.is_(True)
+    try:
+        result = await db.execute(
+            select(Category).where(
+                Category.company_id == company.id,
+                Category.status.is_(True)
+            )
         )
-    )
 
-    categories = result.scalars().all()
+        categories = result.scalars().all()
 
-    data = [
-        CategoryResponse.model_validate(c).model_dump(mode="json")
-        for c in categories
-    ]
+        data = [
+            CategoryResponse.model_validate(c).model_dump(mode="json")
+            for c in categories
+        ]
 
-    await set_cache(cache_key, data, 120)
+        await set_cache(cache_key, data, 120)
 
-    return data
+        return data
+
+    except Exception:
+        raise HTTPException(500, "Failed to fetch categories")
 
 
 
 @router.get("/{company_id}/products", response_model=List[ProductResponse])
+@limiter.limit("60/minute")
 async def get_products(
     company: Company = Depends(get_active_company),
     db: AsyncSession = Depends(get_db)
@@ -80,30 +92,35 @@ async def get_products(
     if cached:
         return cached
 
-    result = await db.execute(
-        select(Product)
-        .options(selectinload(Product.category))  # 🔥 FIX
-        .where(
-            Product.company_id == company.id,
-            Product.status.is_(True),
-            Product.is_available.is_(True)
+    try:
+        result = await db.execute(
+            select(Product)
+            .options(selectinload(Product.category))
+            .where(
+                Product.company_id == company.id,
+                Product.status.is_(True),
+                Product.is_available.is_(True)
+            )
         )
-    )
 
-    products = result.scalars().all()
+        products = result.scalars().all()
 
-    data = [
-        ProductResponse.model_validate(p).model_dump(mode="json")
-        for p in products
-    ]
+        data = [
+            ProductResponse.model_validate(p).model_dump(mode="json")
+            for p in products
+        ]
 
-    await set_cache(cache_key, data, 60)
+        await set_cache(cache_key, data, 60)
 
-    return data
+        return data
+
+    except Exception:
+        raise HTTPException(500, "Failed to fetch products")
 
 
 
 @router.get("/{company_id}/search", response_model=List[ProductResponse])
+@limiter.limit("30/minute")
 async def search_products(
     company: Company = Depends(get_active_company),
     q: str = Query(..., min_length=1),
@@ -115,27 +132,31 @@ async def search_products(
     if cached:
         return cached
 
-    query = (
-        select(Product)
-        .options(selectinload(Product.category))  # 🔥 FIX
-        .where(
-            Product.company_id == company.id,
-            Product.status.is_(True),
-            Product.is_available.is_(True),
-            func.similarity(Product.title, q) > 0.2
+    try:
+        query = (
+            select(Product)
+            .options(selectinload(Product.category))
+            .where(
+                Product.company_id == company.id,
+                Product.status.is_(True),
+                Product.is_available.is_(True),
+                func.similarity(Product.title, q) > 0.2
+            )
+            .order_by(func.similarity(Product.title, q).desc())
+            .limit(10)
         )
-        .order_by(func.similarity(Product.title, q).desc())
-        .limit(10)
-    )
 
-    result = await db.execute(query)
-    products = result.scalars().all()
+        result = await db.execute(query)
+        products = result.scalars().all()
 
-    data = [
-        ProductResponse.model_validate(p).model_dump(mode="json")
-        for p in products
-    ]
+        data = [
+            ProductResponse.model_validate(p).model_dump(mode="json")
+            for p in products
+        ]
 
-    await set_cache(cache_key, data, 30)
+        await set_cache(cache_key, data, 30)
 
-    return data
+        return data
+
+    except Exception:
+        raise HTTPException(500, "Search failed")

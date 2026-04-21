@@ -1,43 +1,19 @@
+import re
 from fastapi import HTTPException, status
 
 
-def validate_new_password(new_password: str, login: str | None = None) -> None:
-    if len(new_password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 6 characters long"
-        )
+def validate_new_password(new_password: str, login: str | None = None):
+    if len(new_password) < 8:
+        raise HTTPException(400, "Password too short")
 
-    if new_password.strip() != new_password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must not start or end with spaces"
-        )
+    if not re.search(r"[A-Z]", new_password):
+        raise HTTPException(400, "Must contain uppercase")
+
+    if not re.search(r"[0-9]", new_password):
+        raise HTTPException(400, "Must contain number")
 
     if " " in new_password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must not contain spaces"
-        )
-
-    weak_passwords = {
-        "123456",
-        "12345678",
-        "qwerty",
-        "password",
-        "admin123",
-        "111111",
-        "000000"
-    }
-
-    if new_password.lower() in weak_passwords:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password is too weak"
-        )
+        raise HTTPException(400, "No spaces allowed")
 
     if login and new_password.lower() == login.lower():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must not be the same as login"
-        )
+        raise HTTPException(400, "Password same as login")

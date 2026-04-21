@@ -1,9 +1,13 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from contextlib import asynccontextmanager
-from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
+
+from contextlib import asynccontextmanager
+from slowapi.middleware import SlowAPIMiddleware
+
 from app.routes import auth, admin, company, menu, upload
+from app.core.rate_limit import limiter
 
 
 
@@ -12,6 +16,10 @@ app = FastAPI(
     version="2.0.0",
     description="API for managing online menus for cafes and restaurants."
 )
+
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
