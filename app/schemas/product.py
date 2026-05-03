@@ -12,6 +12,7 @@ class ProductCreate(BaseModel):
     new_price: Decimal = Field(..., decimal_places=2)
     description: Optional[str] = None
     image: Optional[str] = None
+    image_enhanced: Optional[str] = None
     is_discount: bool = False
     is_available: bool = True
     is_new: bool = False
@@ -27,6 +28,7 @@ class ProductUpdate(BaseModel):
     new_price: Optional[Decimal] = Field(None, decimal_places=2)
     description: Optional[str] = None
     image: Optional[str] = None
+    image_enhanced: Optional[str] = None
     is_discount: Optional[bool] = None
     is_available: Optional[bool] = None
     is_new: Optional[bool] = None

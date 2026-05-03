@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     ADMIN_LOGIN: str = os.getenv("ADMIN_LOGIN")
     ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD")
 
+    # AI Configuration
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
+    AI_ENABLED: bool = os.getenv("AI_ENABLED", "false").lower() == "true"
+
     model_config = SettingsConfigDict(env_file=".env", extra='ignore')
 
 settings = Settings()

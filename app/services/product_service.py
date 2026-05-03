@@ -4,12 +4,16 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from app.core.redis import redis_client
 from app.models.category import Category
 from app.models.products import Product
 from app.schemas.product import ProductCreate, ProductUpdate
 from app.core.cache import clear_product_cache
+from app.core.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 
@@ -66,6 +70,8 @@ async def create_product(
 ) -> Product:
     await _validate_category_belongs_to_company(data.category_id, company_id, db)
 
+    logger.info(f"Creating product '{data.title}' for company {company_id}")
+
     new_product = Product(
         company_id=company_id,
         **data.model_dump(),
@@ -76,9 +82,21 @@ async def create_product(
     try:
         await db.commit()
         await db.refresh(new_product)
-    except Exception:
+        logger.info(f"Product created successfully: ID={new_product.id}")
+    except IntegrityError as e:
         await db.rollback()
-        raise
+        logger.error(f"Integrity error creating product: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Product with this name already exists"
+        )
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error creating product: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create product"
+        )
 
     await clear_product_cache(company_id)
 
@@ -115,15 +133,29 @@ async def update_product(
 
     update_data = data.model_dump(exclude_unset=True)
 
+    logger.info(f"Updating product {product_id} for company {company_id}")
+
     for key, value in update_data.items():
         setattr(product, key, value)
 
     try:
         await db.commit()
         await db.refresh(product)
-    except Exception:
+        logger.info(f"Product {product_id} updated successfully")
+    except IntegrityError as e:
         await db.rollback()
-        raise
+        logger.error(f"Integrity error updating product: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Product update violates constraints"
+        )
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error updating product: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update product"
+        )
 
     await clear_product_cache(company_id)
 
@@ -137,13 +169,20 @@ async def delete_product(
 ):
     product = await _get_company_product(product_id, company_id, db)
 
+    logger.info(f"Deleting product {product_id} for company {company_id}")
+
     await db.delete(product)
 
     try:
         await db.commit()
-    except Exception:
+        logger.info(f"Product {product_id} deleted successfully")
+    except Exception as e:
         await db.rollback()
-        raise
+        logger.error(f"Error deleting product: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete product"
+        )
 
     await clear_product_cache(company_id)
 

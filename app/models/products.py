@@ -12,6 +12,7 @@ class Product(Base):
     title = Column(String, nullable=False, index=True)
     description = Column(Text, nullable=True)
     image = Column(String, nullable=True)
+    image_enhanced = Column(String, nullable=True)
     is_discount = Column(Boolean, default=False, nullable=False)
     is_available = Column(Boolean, default=True, nullable=False, index=True)
     is_new = Column(Boolean, default=False, nullable=False)
